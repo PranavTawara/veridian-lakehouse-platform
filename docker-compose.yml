@@ -1,0 +1,9 @@
+# Placeholder — replace with your actual local stack (database, orchestrator, API, object
+# storage, whatever you choose), or delete this file and use something else entirely if
+# docker-compose isn't your tool of choice. This file intentionally defines nothing: the
+# brief asks YOU to decide what goes here and be ready to justify it.
+#
+# services:
+#   db:
+#     image: postgres:16
+#     ...
