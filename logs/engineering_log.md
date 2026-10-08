@@ -1,17 +1,12 @@
 # Engineering log
 
-Dated, running entries — written as you go, not reconstructed at the end. This is read alongside your
-commit history, so it should roughly track it: what you decided, what broke, how you found out, how
-you fixed it. It doesn't need to be polished. Delete this instructional block once you've started.
+## 2026-10-08: Initial Setup & Data Profiling
+**Objective:** Profile `initial_load` data to inform the High-Level Design (HLD) and Silver-layer data model before writing ingestion code.
 
-A blocked assumption is a legitimate log entry: if something in the data or brief is ambiguous, state
-the assumption you made, note it here, and move on — that's a valid answer in this assignment, not a
-fallback.
-
----
-
-## YYYY-MM-DD
-
-- What you did.
-- What you decided, and a pointer to `docs/decisions/000N-...md` if it was a major one.
-- What broke, and how you diagnosed and fixed it.
+**Key Discoveries & Handled Edge Cases:**
+1. **RFC-4180 Parsing Requirement:** `loan_applications.csv` and `loan_accounts.csv` contain quoted thousands-separators (e.g., `"1,984.47"`). Naive string splitting will fail. Bronze ingestion must use strict CSV parsing.
+2. **Product Master Integrity:** `product_master.csv` has primary key collisions (`PL01`, `GL01`, `ML01` have duplicated rows with casing drift) and conflicting business logic (GL01 has both 9.75% and 9.80% interest rates). 
+   * *Decision:* Silver layer will enforce `UPPER(TRIM())` deduplication and route unresolved conflicts to a `quarantine` table.
+3. **Branch Coverage Gaps:** `branch_master.csv` contains 88 branches, but `branch_financials.csv` only contains 85. 
+   * *Decision:* Gold layer P&L models will use a `LEFT JOIN` from the branch dimension to preserve active branches missing financial extracts, tagging them with a `financials_missing = TRUE` flag.
+4. **Dates:** Format chaos exists across files (ISO, MM/YYYY, DD-MON-YYYY). Bronze will load as raw `TEXT`, and Silver will enforce standardized `DATE`/`TIMESTAMPTZ` casting.
