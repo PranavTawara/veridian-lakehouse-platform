@@ -1,58 +1,98 @@
-# Data Model
+# Low-Level Design (LLD): Data Model & Interface Contracts
 
-## Source Layer (Bronze)
+## 1. Operational Source Layer (`PostgreSQL: source`)
+Represents the core-banking transactional database. Raw CSVs are loaded directly into corresponding tables under the `source` schema with column names standardized to snake_case.
 
-**Ingestion Strategy:** One raw table per source CSV file, loaded into a `bronze` schema.
+* **Schema:** `source`
+* **Tables:** `source.branch_master`, `source.branch_financials`, `source.product_master`, `source.customer_master`, `source.loan_applications`, `source.loan_accounts`, `source.loan_transactions`, `source.region_demographics`, `source.employee_roster`, `source.audit_log`, `source.cgt_rules`.
+* **Storage Contract:** Unmodified text types (`TEXT`) to prevent type coercion drops or silent precision loss during initial landing.
 
-**What we decided NOT to change, and why:**
-* **No Type Casting:** All business columns are ingested as raw `TEXT`. Profiling revealed inconsistent date formats (ISO, MM/YYYY, DD-MON-YYYY) and quoted thousands-separators (e.g., `"1,984.47"` in `loan_applications.csv`). Forcing type casting on ingestion would cause silent record drops.
-* **No Record Filtering:** Malformed rows are retained in Bronze. 
-* **Augmentation:** We strictly append audit metadata (`_batch_id`, `_source_file`, `_loaded_at`) to enable data lineage and replayability.
-* **Parsing constraint:** Ingestion utilizes strict RFC-4180 parsing to safely handle embedded commas within quoted numerics and string fields.
+---
 
-## Conformed / Integrated Layer (Silver)
+## 2. Lakehouse Medallion Layers
 
-Silver is not a 1:1 copy of Bronze. It represents distinct, deduplicated, and conformed business entities (`silver.branches`, `silver.products`, `silver.customers`, `silver.loans`, `silver.transactions`).
+### 2.1 Stage / Bronze Layer (`lakehouse/bronze/`)
+* **Storage Format:** Snappy-compressed columnar Parquet.
+* **Partition Scheme:** `lakehouse/bronze/{source_table}/snapshot_date={YYYY-MM-DD}/data.parquet`
+* **Ingestion Metadata Appended:**
+  * `_batch_id` (`VARCHAR`): Unique UUID per pipeline execution.
+  * `_source_table` (`VARCHAR`): Origin table name in `source` schema.
+  * `_extracted_at` (`TIMESTAMPTZ`): System timestamp when data was pulled from Postgres.
+* **Contract:** 1:1 lossless schema replication from `source.*`. Malformed rows and quoted strings are retained untouched.
 
-**Handling Ambiguities & Integrations:**
-* **Join Keys & Cleaning:** Profiling identified casing drift across regional extracts (e.g., `br-027` vs `BR-027`). All natural join keys (`branch_code`, `product_code`, `customer_id`) are standardized using `UPPER(TRIM(key_col))` before joining.
-* **Duplicate-Key Conflicts:** `product_master` contains primary key collisions (e.g., `GL01` appearing twice with conflicting interest rates of 9.75% and 9.80%). 
-  * *Resolution:* Silver enforces a deduplication strategy (e.g., `ROW_NUMBER()` prioritizing the latest timestamp or highest rate based on business rules). The discarded duplicate is routed to `silver.quarantine_records`.
-* **Orphans (Matched Nothing):** 
-  * `branch_master` contains 88 branches, but `branch_financials` only contains 85. 
-  * *Resolution:* We do not drop the 3 missing branches. They are retained in `silver.branches`. In the Gold layer, fact tables will use a `LEFT JOIN` from the branch dimension, flagging missing financial periods with `financials_missing = TRUE`.
-  * Truly orphaned transactions (e.g., a loan transaction for an `account_id` not in `loan_accounts`) are logged to `silver.quarantine_records` to prevent silent financial misstatements.
-* **Fan-Out Prevention:** Before any left join (e.g., joining `region_demographics` to `branches`), the right-side table is explicitly asserted for uniqueness on the join key to prevent Cartesian explosions on transactional facts.
+---
 
-## Consumption Layer (Gold)
+### 2.2 Conformed / Integrated Layer (`lakehouse/silver/`)
+Silver resolves schema drift, sanitizes malformed data, deduplicates primary keys, and conforms enterprise entities.
 
-Designed as a dimensional star schema to directly power the Leadership Dashboard API endpoints.
+* **Storage Format:** Snappy-compressed Parquet under `lakehouse/silver/`.
 
-**Dimensions:**
-* `gold.dim_branch`: Answers geographic and organizational tiering. 
-* `gold.dim_product`: Answers category classifications (Personal, Gold, MSME).
-* `gold.dim_branch_tier_benchmark`: Answers **"What staffing and risk profile a new branch should be sized for"** (derived from `employee_roster` headcount averages per tier).
+#### Cleaned Entity Contracts:
+1. **`silver.branches`**:
+   * `branch_code` (`VARCHAR`, PK): Normalized via `UPPER(TRIM(branch_code))` to resolve case inconsistencies (e.g., `br-027` vs `BR-027`).
+   * `branch_name` (`VARCHAR`), `region_id` (`VARCHAR`), `tier` (`VARCHAR`), `opened_date` (`DATE`).
+2. **`silver.products`**:
+   * `product_code` (`VARCHAR`, PK): Deduplicated using `ROW_NUMBER() OVER (PARTITION BY UPPER(TRIM(product_code)) ORDER BY effective_date DESC, interest_rate DESC)` to resolve collisions (e.g., `GL01`, `PL01`, `ML01`). Conflicting duplicate entries are routed to quarantine.
+   * `product_name` (`VARCHAR`), `product_category` (`VARCHAR`), `interest_rate` (`NUMERIC(5,2)`).
+3. **`silver.customers`**:
+   * `customer_id` (`VARCHAR`, PK), `credit_score` (`INTEGER`), `annual_income` (`NUMERIC(14,2)`), `kyc_status` (`VARCHAR`).
+4. **`silver.loans`**:
+   * `account_id` (`VARCHAR`, PK), `customer_id` (`VARCHAR`), `product_code` (`VARCHAR`), `branch_code` (`VARCHAR`).
+   * `disbursed_amount` (`NUMERIC(14,2)`): Stripped of thousands-separator commas (e.g., `"1,984.47"` -> `1984.47`).
+   * `current_balance` (`NUMERIC(14,2)`), `loan_status` (`VARCHAR`), `disbursal_date` (`DATE`).
+5. **`silver.transactions`**:
+   * `transaction_id` (`VARCHAR`, PK), `account_id` (`VARCHAR`), `transaction_date` (`DATE`), `amount` (`NUMERIC(14,2)`), `transaction_type` (`VARCHAR`).
+6. **`silver.quarantine_records`**:
+   * Storage: `lakehouse/silver/quarantine/quarantine_log.parquet`.
+   * Captures rejected rows: unresolvable duplicate keys, orphan transactions where `account_id` does not exist in `silver.loans`, and corrupted timestamps.
+   * Attributes: `quarantine_id`, `source_table`, `record_identifier`, `rejection_reason`, `raw_payload`, `quarantined_at`.
 
-**Facts:**
-* `gold.fact_branch_monthly_pnl`: 
-  * *Answers:* **"Which existing branches are performing best?"**
-  * *Derivation:* Combines `branch_financials` with `dim_branch` to compute `net_contribution = interest_income - operating_cost`.
-* `gold.fact_regional_loan_demand`: 
-  * *Answers:* **"How loan/deposit product demand varies by region."**
-  * *Derivation:* Aggregates `loan_transactions` (Disbursements only) by `region` and `product_category`.
-* `gold.fact_regional_risk_profile`: 
-  * *Answers:* **"Where portfolio risk is concentrated geographically."**
-  * *Derivation:* Aggregates `loan_accounts` balances, calculating `npa_rate` (default vs total book) and assigning RAG status thresholds.
+---
 
-## Keys, Types, and Grain
+### 2.3 Consumption Layer (`lakehouse/gold/`)
+Star schema dimensional tables optimized to answer core business questions.
 
-Downstream API consumers and reporting tools must respect the following grains and constraints:
+#### Dimensional Models:
+* **`dim_branch`**:
+  * Grain: 1 row per physical branch.
+  * Attributes: `branch_key` (UUID / Surrogate PK), `branch_code` (Natural Key), `branch_name`, `region_id`, `region_name`, `tier`, `opened_date`.
+* **`dim_product`**:
+  * Grain: 1 row per loan product.
+  * Attributes: `product_key` (Surrogate PK), `product_code`, `product_name`, `product_category`, `base_interest_rate`.
+* **`dim_branch_tier_benchmark`**:
+  * Grain: 1 row per branch tier (`Metro`, `Urban`, `Semi-Urban`, `Rural`).
+  * Attributes: `tier`, `avg_staff_count`, `target_loan_disbursement`, `risk_threshold_npa_pct`.
 
-* **Surrogate Keys:** The Gold layer utilizes surrogate keys (e.g., `branch_key` UUID/Integer) instead of natural keys (`branch_code`). This protects the reporting layer if legacy core-banking systems alter their branch code formats in the future.
-* **Grains:**
-  * `fact_branch_monthly_pnl`: 1 row per `branch_key` per `reporting_month`.
-  * `fact_regional_loan_demand`: 1 row per `region` per `product_key` per `quarter/month`.
-  * `fact_regional_risk_profile`: 1 row per `region` snapshot.
-* **Nullability Notes:** 
-  * `approved_amount` in loan applications is explicitly **NULLABLE**. Pending applications will not have an approved amount; downstream average ticket size calculations must strictly use `NULL` rather than coercing to `0.00` to avoid skewing the denominator.
-  * `net_contribution` in `fact_branch_monthly_pnl` may be `NULL` for newly launched branches where legacy P&L extracts have not yet been generated.
+#### Fact Models:
+* **`fact_branch_monthly_pnl`**:
+  * Grain: 1 row per `branch_key` per `reporting_month` (`YYYY-MM`).
+  * Metrics: `interest_income`, `fee_income`, `operating_cost`, `net_contribution` (`interest_income + fee_income - operating_cost`).
+  * Missing Branch Logic: Joined via `dim_branch LEFT JOIN branch_financials`. All 88 branches are retained. If a branch has no financial record (the 3 missing branches), financials are set to `NULL` and `financials_missing = TRUE`.
+* **`fact_regional_loan_demand`**:
+  * Grain: 1 row per `region_id` per `product_category` per `reporting_month`.
+  * Metrics: `total_disbursed_volume`, `loan_application_count`, `avg_approved_ticket_size`.
+* **`fact_regional_risk_profile`**:
+  * Grain: 1 row per `region_id` per snapshot date.
+  * Metrics: `total_book_balance`, `npa_balance`, `npa_rate` (`(npa_balance / total_book_balance) * 100`), `rag_status` (`GREEN` if <3%, `AMBER` if 3%-5%, `RED` if >5%).
+
+---
+
+## 3. Serving Layer & Data Mart Contracts (`PostgreSQL: serving`)
+
+The Gold Parquet models are synchronized into indexed PostgreSQL tables under the `serving` schema:
+
+* `serving.dim_branch`
+* `serving.dim_product`
+* `serving.dim_branch_tier_benchmark`
+* `serving.fact_branch_monthly_pnl`
+* `serving.fact_regional_loan_demand`
+* `serving.fact_regional_risk_profile`
+
+### API Endpoint Mapping
+
+| API Endpoint | Query Source | Query Filter / Logic |
+| :--- | :--- | :--- |
+| `GET /api/v1/branches/profitability` | `serving.fact_branch_monthly_pnl` ⨝ `serving.dim_branch` | Evaluates net contribution by branch and filters active branches missing P&L. |
+| `GET /api/v1/regions/loan-demand` | `serving.fact_regional_loan_demand` | Aggregates volume and ticket sizes by region and category. |
+| `GET /api/v1/regions/risk-profile` | `serving.fact_regional_risk_profile` | Returns NPA ratios and assigned RAG indicators for map/table widgets. |
+| `GET /api/v1/benchmarks/tiers` | `serving.dim_branch_tier_benchmark` | Returns headcount and operational sizing benchmarks. |
