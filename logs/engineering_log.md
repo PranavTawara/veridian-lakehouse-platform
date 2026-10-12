@@ -10,3 +10,14 @@
 3. **Branch Coverage Gaps:** `branch_master.csv` contains 88 branches, but `branch_financials.csv` only contains 85. 
    * *Decision:* Gold layer P&L models will use a `LEFT JOIN` from the branch dimension to preserve active branches missing financial extracts, tagging them with a `financials_missing = TRUE` flag.
 4. **Dates:** Format chaos exists across files (ISO, MM/YYYY, DD-MON-YYYY). Bronze will load as raw `TEXT`, and Silver will enforce standardized `DATE`/`TIMESTAMPTZ` casting.
+
+## 2026-10-12: Architecture Review & Whiteboard Alignment
+**Objective:** Align repository High-Level Design (HLD) and Low-Level Design (LLD) with whiteboard discussion feedback.
+
+**Key Updates:**
+1. **Separation of OLTP and Lakehouse:** Refactored the architecture from hosting all layers in a single Postgres database into three distinct architectural boundaries:
+   - Source OLTP DB (`Postgres: source` schema) simulating core-banking production tables.
+   - Analytical Lakehouse (`Bronze` -> `Silver` -> `Gold` stored as Parquet files) to isolate compute from transactional operations.
+   - Serving Data Mart (`Postgres: serving` schema) loaded from Gold to serve low-latency queries to FastAPI.
+2. **Design Status:** ADR 001 updated to `Status: Proposed (Awaiting Review)` pending senior sign-off.
+3. **Data Contracts:** Formalized schemas, join criteria (preserving all 88 branches), surrogate key patterns, and quarantine error logging.
