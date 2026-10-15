@@ -1,7 +1,7 @@
 # Architecture Decision Record 002: Platform Architecture & Component Boundaries (HLD)
 
 ## Status
-Proposed (Awaiting Review)
+Superseded by ADR 003
 
 ## Context
 Veridian Finance requires an enterprise-grade data platform to ingest transactional core-banking data, clean structural anomalies, build analytical models, and serve executive KPIs to a leadership dashboard.
