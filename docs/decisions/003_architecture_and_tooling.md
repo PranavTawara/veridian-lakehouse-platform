@@ -15,13 +15,38 @@ Executing transformations, deduplication, and joins directly within an operation
 
 ## Architecture Topology
 
-┌──────────────────┐      ┌─────────────────────────┐      ┌──────────────────────────────────────────────────────────────────┐      ┌─────────────────────────┐      ┌─────────────────────┐
-│   Raw Extracts   │ ───► │  Operational Source DB  │ ───► │               Decoupled Analytical Lakehouse                     │ ───► │    Serving Data Mart    │ ───► │   Reporting & UI    │
-│  (11 Raw CSVs)   │      │   Postgres (source.*) │      │  Bronze (Lossless) ──► Silver (Conformed) ──► Gold (Star Models) │      │  Postgres (serving.*) │      │  FastAPI + Dash UI  │
-└──────────────────┘      └─────────────────────────┘      │                             │                                    │      └─────────────────────────┘      └─────────────────────┘
-│                             ▼                                    │
-│                   [Quarantine Parquet]                           │
-└──────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────┐
+│ 1. Raw Extracts: 11 CSV files in initial_load/                        │
+└──────────────────────────────────┬────────────────────────────────────┘
+                                   │
+                                   ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│ 2. Operational Source Database: PostgreSQL 16 (source.* schema)       │
+└──────────────────────────────────┬────────────────────────────────────┘
+                                   │ (Batch extract to Parquet)
+                                   ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│ 3. Decoupled Analytical Lakehouse (Columnar Parquet Storage)          │
+│                                                                       │
+│   ┌────────────────┐      ┌────────────────┐      ┌───────────────┐   │
+│   │  Bronze (Raw)  │ ───► │ Silver (Clean) │ ───► │  Gold (Star)  │   │
+│   └────────────────┘      └───────┬────────┘      └───────────────┘   │
+└───────────────────────────────────┼───────────────────────────────────┘
+                                    │ (Failed checks & orphans)
+                                    ▼
+                           ┌──────────────────┐
+                           │ Quarantine Store │
+                           └──────────────────┘
+                                    │
+                                    ▼ (Sync Gold facts & dims)
+┌───────────────────────────────────────────────────────────────────────┐
+│ 4. Serving Data Mart: PostgreSQL 16 (serving.* schema)                │
+└──────────────────────────────────┬────────────────────────────────────┘
+                                   │
+                                   ▼
+┌───────────────────────────────────────────────────────────────────────┐
+│ 5. Reporting Layer: FastAPI REST Endpoints ──► Executive Dashboard UI │
+└───────────────────────────────────────────────────────────────────────┘
 
 ## Architectural Boundaries & Component Responsibilities
 
