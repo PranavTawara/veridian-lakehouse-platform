@@ -31,3 +31,13 @@
 3. **Regulatory Truth Derivation:** Codified `is_regulatory_npa = (dpd >= 90 OR npa_flag = 'Y')` to rectify the 100% false negative source flags across all 14,345 loan accounts.
 4. **Master Data Management:** Defined deterministic SCD Type 1 window deduplication for 2,740 conflicting customer records and catalog collision resolution for product `GL01`[cite: 4].
 5. **Geographic Conformance:** Enforced conformed dimension hierarchy from `dim_branch`, resolving 424 conflicting region records in transactional feeds.
+
+## 2026-10-15: Architecture Formalization — Enterprise Delta Lakehouse (ADR 004)
+**Objective:** Incorporate reviewer feedback regarding Lakehouse table format definitions and establish the full PySpark + Delta Lake + dbt + Airflow architecture[cite: 4, 19].
+
+**Key Architectural Decisions & Formalizations:**
+1. **Adoption of Delta Lake Open Table Format:** Replaced unmanaged Parquet file dumping with ACID-compliant Delta tables across Bronze, Silver, and Gold[cite: 4, 19]. Every entity now maintains an active `_delta_log/` commit log, enabling atomic writes, schema enforcement, time-travel auditability, and native `MERGE INTO` operations[cite: 4, 19].
+2. **PySpark Compute Engine:** Formalized PySpark 3.5 (`delta-spark`) as the core engine for JDBC extraction from PostgreSQL `source`, regex string sanitization, 13-digit Unix ms epoch conversion, and quarantine routing[cite: 4].
+3. **dbt Semantic Modeling & Governance:** Integrated dbt for Gold star schema transformations, version-controlled testing (`unique`, `not_null`, `relationships`), and automated lineage generation[cite: 4].
+4. **Airflow Orchestration Control Plane:** Documented task-level failure isolation and reconciliation circuit-breakers in Airflow to manage Day-2 incremental loads idempotently[cite: 4].
+5. **Data Quality Contracts:** Fully codified the resolution of the ₹135.5B ledger variance, regulatory NPA derivations, customer master SCD-1 window deduplication, and ghost branch quarantining[cite: 4].
