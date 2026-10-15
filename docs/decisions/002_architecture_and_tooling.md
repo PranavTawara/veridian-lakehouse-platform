@@ -1,4 +1,4 @@
-# Architecture Decision Record 001: Platform Architecture & Component Boundaries (HLD)
+# Architecture Decision Record 002: Platform Architecture & Component Boundaries (HLD)
 
 ## Status
 Proposed (Awaiting Review)
