@@ -21,3 +21,13 @@
    - Serving Data Mart (`Postgres: serving` schema) loaded from Gold to serve low-latency queries to FastAPI.
 2. **Design Status:** ADR 001 updated to `Status: Proposed (Awaiting Review)` pending senior sign-off.
 3. **Data Contracts:** Formalized schemas, join criteria (preserving all 88 branches), surrogate key patterns, and quarantine error logging.
+
+## 2026-10-15: Finalization of Empirical HLD (ADR 003) and LLD Contracts
+**Objective:** Formalize ADR 003 and update the Data Model contracts based on exhaustive profiling across all 11 CSV files in `initial_load/`[cite: 4].
+
+**Key Architectural Advancements:**
+1. **ADR 003 Promotion:** Promoted HLD to ADR 003, establishing physical compute decoupling (PostgreSQL source -> Parquet Medallion -> PostgreSQL serving) and empirical quarantine architecture[cite: 4].
+2. **Ledger Balancing Contract:** Addressed the ₹135.5B transaction-to-account variance through deduplication (1,255 duplicate transactions), currency sanitization, and isolating 1,002 orphan transactions into `silver.quarantine_records`[cite: 4].
+3. **Regulatory Truth Derivation:** Codified `is_regulatory_npa = (dpd >= 90 OR npa_flag = 'Y')` to rectify the 100% false negative source flags across all 14,345 loan accounts.
+4. **Master Data Management:** Defined deterministic SCD Type 1 window deduplication for 2,740 conflicting customer records and catalog collision resolution for product `GL01`[cite: 4].
+5. **Geographic Conformance:** Enforced conformed dimension hierarchy from `dim_branch`, resolving 424 conflicting region records in transactional feeds.
