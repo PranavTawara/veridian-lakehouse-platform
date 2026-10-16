@@ -7,7 +7,7 @@ Proposed (Awaiting Review)
 Initial architectural iterations explored hosting Medallion schemas inside PostgreSQL (ADR 001/002) and storing plain Parquet files on disk (ADR 003). However, architectural review and technical evaluation identified two critical platform constraints:
 
 1. **Storage Format Limitation:** Simply landing raw Parquet files on disk constitutes an unmanaged Data Lake, not an enterprise Lakehouse. Plain Parquet lacks ACID transaction guarantees, contains no centralized transaction log, cannot enforce schema constraints at write time, and cannot perform atomic row-level `MERGE INTO` (upsert) operations without rewriting entire directories. This makes managing Day-2 incremental loads ("Wave 2") brittle and prone to silent corruption.
-2. **Empirical Data Anomalies:** Profiling 209,926 records across all 11 raw CSV extracts in `initial_load/` exposed severe operational data quality issues[cite: 4, 14, 16]:
+2. **Empirical Data Anomalies:** Profiling 209,926 records across all 11 raw CSV extracts in `initial_load/` exposed severe operational data quality issues:
    - **₹135.5B Macro Reconciliation Gap:** Total disbursements in `loan_transactions` (₹141.4B) diverge 24x from principal in `loan_accounts` (₹5.88B) due to currency symbol contamination (`$`, `₹`), 1,255 duplicate transactions, and 1,002 orphan accounts.
    - **Operational NPA Failure:** 100% of records in `loan_accounts` default to `npa_flag = 'N'` despite hundreds exceeding 90 Days Past Due (DPD).
    - **Master Entity Collisions:** 2,740 conflicting duplicate `customer_id` rows (0 exact duplicates), `product_master` primary key collisions (`GL01` rate discrepancy, blank code for Two-Wheeler), and ghost branches (`BR-999`, `BR-0XX`).
@@ -20,6 +20,7 @@ The platform requires an open table format with ACID transactions (Delta Lake), 
 
 ## Architecture Topology
 
+```text
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ 1. Operational Source System: PostgreSQL 16 (source.* schema)            │
 │    - Emulates core banking OLTP cluster                                  │
@@ -67,6 +68,7 @@ The platform requires an open table format with ACID transactions (Delta Lake), 
 │    - FastAPI Service: /api/v1/branches/profitability, etc.               │
 │    - Apache Airflow 2.9 UI: DAG monitoring, telemetry, circuit breaker   │
 └──────────────────────────────────────────────────────────────────────────┘
+```
 
 ## Component Boundaries & Technology Justification
 
