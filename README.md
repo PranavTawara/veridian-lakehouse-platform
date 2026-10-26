@@ -1,30 +1,23 @@
-# Veridian Finance DE Platform — <your name>
+# Veridian Lakehouse Platform
 
-Replace this whole file with your own. Two things must survive whatever you write:
+An enterprise financial data lakehouse and API serving platform implementing Medallion Architecture (Bronze -> Silver -> Gold) on Delta Lake and PostgreSQL. The system is orchestrated via Apache Airflow, modeled via dbt, exposed via a Hasura GraphQL/REST API gateway, and audited by an automated 10-gate financial reconciliation engine.
 
-1. **How to run everything, from a clean checkout.** Assume the reader has Docker and nothing else
-   pre-installed. If a step needs a password/port/env var, say what and where.
-2. **A short summary of the decisions you'd defend**, the trade-offs you accepted, and what you'd do
-   differently with more time. A page is plenty — see the assignment brief for the exact ask.
+> **Execution Environment:** 100% Local Containerized Lakehouse (Zero-Cloud-Cost Reference Architecture). Fully reproducible on a local workstation without external cloud dependencies, with a direct 1:1 migration path to AWS (S3, RDS, MWAA, ECS).
 
-Everything else in this workspace (`docs/`, `logs/`, and the per-layer folders below) is a suggested
-starting shape, not a checklist you must fill in completely. Reorganize, rename, delete, or ignore any
-of it — the brief says so, and it means it. The one part that isn't optional is keeping
-`logs/engineering_log.md` current as you actually work, not reconstructed at the end.
+---
 
-## Suggested layout (yours to change)
+## 1. Quickstart: Clean Checkout Runbook
 
-```
-docs/
-├── data_model.md         your schema + reasoning
-└── decisions/            one note per major decision — see docs/decisions/0001-example.md
-logs/
-└── engineering_log.md    dated, running log — start writing here on day one
-ingestion/
-transformation/           e.g. a dbt project or equivalent
-orchestration/            DAGs / flows / scheduler config
-api/
-dq_checks/
-recon/
-docker-compose.yml        or equivalent, for local run
-```
+### Prerequisites
+* Docker & Docker Compose
+* Python 3.10+ (tested on Ubuntu 24.04 with Python 3.12)
+* Java 8/11/17 (required for local PySpark execution)
+
+---
+
+### A. Environment Setup & Services
+
+1. Clone the repository:
+   ```bash
+   git clone [https://github.com/PranavTawara/veridian-lakehouse-platform.git](https://github.com/PranavTawara/veridian-lakehouse-platform.git)
+   cd veridian-lakehouse-platform
