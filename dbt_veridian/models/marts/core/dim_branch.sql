@@ -9,4 +9,5 @@ SELECT
     city,
     branch_type,
     open_date
+    , CURRENT_TIMESTAMP AS _loaded_at
 FROM {{ source('silver', 'branches') }}

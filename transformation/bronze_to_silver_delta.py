@@ -20,7 +20,7 @@ def get_spark_session():
         .config("spark.sql.warehouse.dir", "/tmp/spark-warehouse")
         .config("spark.driver.memory", "2g")
     )
-    return configure_spark_with_delta_pip(builder).getOrCreate()
+    return configure_spark_with_delta_pip(builder).config("spark.databricks.delta.schema.autoMerge.enabled", "true").getOrCreate()
 
 def parse_epoch_or_iso_timestamp(col_name):
     return when(
@@ -73,7 +73,7 @@ def run_silver_pipeline():
 
     w_branch = Window.partitionBy("branch_code").orderBy(col("open_date").desc(), col("branch_name").asc())
     df_branches = df_bm_valid.withColumn("rk", row_number().over(w_branch)).filter(col("rk") == 1).drop("rk")
-    df_branches.write.format("delta").mode("overwrite").save(os.path.join(SILVER_DIR, "branches"))
+    df_branches.withColumn("_loaded_at", current_timestamp()).write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(os.path.join(SILVER_DIR, "branches"))
     valid_branch_codes = [r.branch_code for r in df_branches.select("branch_code").collect()]
     print(f"   ✅ Saved {df_branches.count()} conformed unique branches.")
 
@@ -107,7 +107,7 @@ def run_silver_pipeline():
         quarantine_accum.append(df_pm_quarantine)
 
     df_products = df_pm_ranked.filter(col("rk") == 1).drop("rk")
-    df_products.write.format("delta").mode("overwrite").save(os.path.join(SILVER_DIR, "products"))
+    df_products.withColumn("_loaded_at", current_timestamp()).write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(os.path.join(SILVER_DIR, "products"))
     print(f"   ✅ Saved {df_products.count()} conformed products.")
 
     # -------------------------------------------------------------------------
@@ -131,7 +131,7 @@ def run_silver_pipeline():
         when(col("kyc_status") == "VERIFIED", 1).otherwise(0).desc()
     )
     df_customers = df_cm_staged.withColumn("rk", row_number().over(w_cust)).filter(col("rk") == 1).drop("rk")
-    df_customers.write.format("delta").mode("overwrite").save(os.path.join(SILVER_DIR, "customers"))
+    df_customers.withColumn("_loaded_at", current_timestamp()).write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(os.path.join(SILVER_DIR, "customers"))
     print(f"   ✅ Saved {df_customers.count():,} conformed customers.")
 
     # -------------------------------------------------------------------------
@@ -173,7 +173,7 @@ def run_silver_pipeline():
         when(col("status") == "ACTIVE", 1).otherwise(0).desc()
     )
     df_employees = df_emp_valid.withColumn("rk", row_number().over(w_emp)).filter(col("rk") == 1).drop("rk")
-    df_employees.write.format("delta").mode("overwrite").save(os.path.join(SILVER_DIR, "employees"))
+    df_employees.withColumn("_loaded_at", current_timestamp()).write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(os.path.join(SILVER_DIR, "employees"))
     print(f"   ✅ Saved {df_employees.count():,} conformed employees.")
 
     # -------------------------------------------------------------------------
@@ -226,7 +226,7 @@ def run_silver_pipeline():
         )
         quarantine_accum.append(df_la_quarantine)
 
-    df_loans_valid.write.format("delta").mode("overwrite").save(os.path.join(SILVER_DIR, "loans"))
+    df_loans_valid.withColumn("_loaded_at", current_timestamp()).write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(os.path.join(SILVER_DIR, "loans"))
     npa_count = df_loans_valid.filter(col("is_regulatory_npa") == True).count()
     print(f"   ✅ Saved {df_loans_valid.count():,} conformed loans ({npa_count:,} flagged as Regulatory NPA).")
 
@@ -275,7 +275,7 @@ def run_silver_pipeline():
         ).otherwise(col("clean_amount"))
     ).drop("principal_amount")
 
-    df_tx_conformed.write.format("delta").mode("overwrite").save(os.path.join(SILVER_DIR, "transactions"))
+    df_tx_conformed.withColumn("_loaded_at", current_timestamp()).write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(os.path.join(SILVER_DIR, "transactions"))
     print(f"   ✅ Saved {df_tx_conformed.count():,} conformed transactions.")
 
     # -------------------------------------------------------------------------
@@ -286,7 +286,7 @@ def run_silver_pipeline():
     for df_q in quarantine_accum[1:]:
         df_final_quarantine = df_final_quarantine.unionByName(df_q)
 
-    df_final_quarantine.write.format("delta").mode("overwrite").save(QUARANTINE_PATH)
+    df_final_quarantine.withColumn("_loaded_at", current_timestamp()).write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(QUARANTINE_PATH)
     print(f"   ✅ Saved {df_final_quarantine.count():,} rejected/orphan records into {QUARANTINE_PATH}.")
 
     print("=" * 80)

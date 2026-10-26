@@ -25,5 +25,6 @@ SELECT
         WHEN f.interest_income IS NULL OR f.operating_cost IS NULL THEN TRUE 
         ELSE FALSE 
     END AS financials_missing
+    , CURRENT_TIMESTAMP AS _loaded_at
 FROM branch_base b
 LEFT JOIN financials f ON b.branch_code = f.branch_code

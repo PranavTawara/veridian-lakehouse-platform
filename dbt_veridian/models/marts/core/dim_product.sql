@@ -6,4 +6,5 @@ SELECT
     product_name,
     category,
     interest_rate
+    , CURRENT_TIMESTAMP AS _loaded_at
 FROM {{ source('silver', 'products') }}

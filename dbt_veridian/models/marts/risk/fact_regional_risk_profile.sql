@@ -24,4 +24,5 @@ SELECT
         WHEN (npa_balance / nullif(total_book_balance, 0) * 100) <= 5.0 THEN 'AMBER'
         ELSE 'RED'
     END AS rag_status
+    , CURRENT_TIMESTAMP AS _loaded_at
 FROM loan_summary
