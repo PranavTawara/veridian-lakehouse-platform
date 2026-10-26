@@ -12,7 +12,7 @@ DB_CONFIG = {
 
 def run_reconciliation():
     print("=" * 105)
-    print("VERIDIAN DATA PLATFORM: ENTERPRISE FINANCIAL, PIPELINE & RECONCILIATION AUDIT (10-GATE SUITE)")
+    print("VERIDIAN DATA PLATFORM: ENTERPRISE FINANCIAL, PIPELINE & RECONCILIATION AUDIT (11-GATE SUITE)")
     print(f"Timestamp: {datetime.now(timezone.utc).isoformat()}")
     print("=" * 105)
 
@@ -67,7 +67,7 @@ def run_reconciliation():
 
     print(f"2. Quarantine Layer Audit Breakdown (Total Quarantined: {total_quar:,}):")
     for r in quar_rows:
-        print(f"   • [{r['source_table']}] Code: {r['rejection_code']:<22} Rejected: {r['rejected_count']:,} records")
+        print(f"   • [{r['source_table']}] Code: {r['rejection_code']:<24} Rejected: {r['rejected_count']:,} records")
     print("   • Zero Silent Loss Verdict:        [PASS]\n")
 
     # -------------------------------------------------------------------------
@@ -279,6 +279,72 @@ def run_reconciliation():
     print(f"   • Ingested Deposit Accounts:        {bronze_scope['total_deposits']:,} rows (Preserved raw for liability portfolio)")
     print(f"   • Macro Demographic Benchmarks:    {bronze_scope['total_demographics']} regions (Preserved raw for GIS enrichment)")
     print("   • Scope Accounting Verdict:        [PASS]\n")
+
+    # -------------------------------------------------------------------------
+    # 11. Multi-Channel Primary Key Purity & Empty/Null Key Assertions
+    # -------------------------------------------------------------------------
+    cur.execute("""
+        WITH pk_audit AS (
+            SELECT 'silver.products' AS tbl, 'product_code' AS pk,
+                CASE WHEN product_code IS NULL THEN 'NULL_PK'
+                     WHEN trim(product_code) = '' THEN 'EMPTY_PK'
+                     ELSE 'VALID' END AS status
+            FROM silver.products
+            UNION ALL
+            SELECT 'silver.branches', 'branch_code',
+                CASE WHEN branch_code IS NULL THEN 'NULL_PK'
+                     WHEN trim(branch_code) = '' THEN 'EMPTY_PK'
+                     ELSE 'VALID' END
+            FROM silver.branches
+            UNION ALL
+            SELECT 'silver.customers', 'customer_id',
+                CASE WHEN customer_id IS NULL THEN 'NULL_PK'
+                     WHEN trim(customer_id) = '' THEN 'EMPTY_PK'
+                     ELSE 'VALID' END
+            FROM silver.customers
+            UNION ALL
+            SELECT 'silver.employees', 'employee_id',
+                CASE WHEN employee_id IS NULL THEN 'NULL_PK'
+                     WHEN trim(employee_id) = '' THEN 'EMPTY_PK'
+                     ELSE 'VALID' END
+            FROM silver.employees
+            UNION ALL
+            SELECT 'silver.loans', 'account_id',
+                CASE WHEN account_id IS NULL THEN 'NULL_PK'
+                     WHEN trim(account_id) = '' THEN 'EMPTY_PK'
+                     ELSE 'VALID' END
+            FROM silver.loans
+            UNION ALL
+            SELECT 'silver.transactions', 'txn_id',
+                CASE WHEN txn_id IS NULL THEN 'NULL_PK'
+                     WHEN trim(txn_id) = '' THEN 'EMPTY_PK'
+                     ELSE 'VALID' END
+            FROM silver.transactions
+        )
+        SELECT 
+            tbl, 
+            pk,
+            count(*) AS total_rows,
+            sum(CASE WHEN status = 'NULL_PK' THEN 1 ELSE 0 END) AS null_keys,
+            sum(CASE WHEN status = 'EMPTY_PK' THEN 1 ELSE 0 END) AS empty_keys
+        FROM pk_audit
+        GROUP BY tbl, pk
+        ORDER BY tbl;
+    """)
+    pk_results = cur.fetchall()
+    pk_status = "PASS"
+
+    print("11. Multi-Channel Primary Key Purity & Empty/Null Key Assertions:")
+    for r in pk_results:
+        invalid_cnt = r['null_keys'] + r['empty_keys']
+        line_status = "PASS" if invalid_cnt == 0 else "FAIL"
+        if line_status == "FAIL":
+            pk_status = "FAIL"
+        print(f"   • {r['tbl']:<22} (PK: {r['pk']:<12}) -> Total: {r['total_rows']:>7,} | NULL: {r['null_keys']} | Empty: {r['empty_keys']} | [{line_status}]")
+    print(f"   • Primary Key Integrity Verdict:         [{pk_status}]\n")
+
+    if pk_status == "FAIL":
+        report_status = "FAILED"
 
     print("=" * 105)
     print(f"OVERALL RECONCILIATION RESULT: [{report_status}]")

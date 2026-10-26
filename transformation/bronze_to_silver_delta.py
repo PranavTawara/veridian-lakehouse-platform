@@ -42,7 +42,7 @@ def run_silver_pipeline():
     quarantine_accum = []
 
     # -------------------------------------------------------------------------
-    # 1. silver.branches (Deduplicated on branch_code -> 85 unique branches)
+    # 1. silver.branches (PK: branch_code)
     # -------------------------------------------------------------------------
     print("⚙️ Processing silver.branches...")
     df_bm_raw = spark.read.format("delta").load(os.path.join(BRONZE_DIR, "branch_master"))
@@ -57,19 +57,32 @@ def run_silver_pipeline():
         to_date(col("open_date")).alias("open_date")
     )
 
-    ghost_branches = df_bm_staged.filter(col("branch_code").isin("BR-999", "BR-0XX"))
+    # Gate: Reject NULL or Empty Primary Keys
+    df_bm_invalid_pk = df_bm_staged.filter(col("branch_code").isNull() | (trim(col("branch_code")) == ""))
+    if df_bm_invalid_pk.count() > 0:
+        quarantine_accum.append(df_bm_invalid_pk.select(
+            expr("uuid()").alias("quarantine_id"),
+            lit("branch_master").alias("source_table"),
+            expr("coalesce(branch_name, 'UNKNOWN_BRANCH')").alias("record_identifier"),
+            lit("INVALID_PRIMARY_KEY").alias("rejection_code"),
+            to_json(struct("*")).alias("raw_payload"),
+            current_timestamp().alias("quarantined_at")
+        ))
+
+    df_bm_valid_pk = df_bm_staged.filter(col("branch_code").isNotNull() & (trim(col("branch_code")) != ""))
+
+    ghost_branches = df_bm_valid_pk.filter(col("branch_code").isin("BR-999", "BR-0XX"))
     if ghost_branches.count() > 0:
-        df_bm_quarantine = ghost_branches.select(
+        quarantine_accum.append(ghost_branches.select(
             expr("uuid()").alias("quarantine_id"),
             lit("branch_master").alias("source_table"),
             col("branch_code").alias("record_identifier"),
             lit("GHOST_BRANCH").alias("rejection_code"),
             to_json(struct("*")).alias("raw_payload"),
             current_timestamp().alias("quarantined_at")
-        )
-        quarantine_accum.append(df_bm_quarantine)
+        ))
 
-    df_bm_valid = df_bm_staged.filter(~col("branch_code").isin("BR-999", "BR-0XX"))
+    df_bm_valid = df_bm_valid_pk.filter(~col("branch_code").isin("BR-999", "BR-0XX"))
 
     w_branch = Window.partitionBy("branch_code").orderBy(col("open_date").desc(), col("branch_name").asc())
     df_branches = df_bm_valid.withColumn("rk", row_number().over(w_branch)).filter(col("rk") == 1).drop("rk")
@@ -78,11 +91,12 @@ def run_silver_pipeline():
     print(f"   ✅ Saved {df_branches.count()} conformed unique branches.")
 
     # -------------------------------------------------------------------------
-    # 2. silver.products
+    # 2. silver.products (PK: product_code)
     # -------------------------------------------------------------------------
     print("⚙️ Processing silver.products...")
     df_pm_raw = spark.read.format("delta").load(os.path.join(BRONZE_DIR, "product_master"))
 
+    # Upstream source fix: Map Two-Wheeler Loan to TL01 if missing, uppercase others
     df_pm_staged = df_pm_raw.select(
         when(trim(col("product_name")) == "Two-Wheeler Loan", lit("TL01"))
         .otherwise(upper(trim(col("product_code")))).alias("product_code"),
@@ -91,27 +105,40 @@ def run_silver_pipeline():
         clean_currency_to_double("interest_rate").alias("interest_rate")
     )
 
+    # Gate: Reject NULL or Empty Primary Keys
+    df_pm_invalid_pk = df_pm_staged.filter(col("product_code").isNull() | (trim(col("product_code")) == ""))
+    if df_pm_invalid_pk.count() > 0:
+        quarantine_accum.append(df_pm_invalid_pk.select(
+            expr("uuid()").alias("quarantine_id"),
+            lit("product_master").alias("source_table"),
+            expr("coalesce(product_name, 'UNKNOWN_PRODUCT')").alias("record_identifier"),
+            lit("INVALID_PRIMARY_KEY").alias("rejection_code"),
+            to_json(struct("*")).alias("raw_payload"),
+            current_timestamp().alias("quarantined_at")
+        ))
+
+    df_pm_valid_pk = df_pm_staged.filter(col("product_code").isNotNull() & (trim(col("product_code")) != ""))
+
     w_prod = Window.partitionBy("product_code").orderBy(col("interest_rate").desc())
-    df_pm_ranked = df_pm_staged.withColumn("rk", row_number().over(w_prod))
+    df_pm_ranked = df_pm_valid_pk.withColumn("rk", row_number().over(w_prod))
 
     df_pm_conflicts = df_pm_ranked.filter(col("rk") > 1)
     if df_pm_conflicts.count() > 0:
-        df_pm_quarantine = df_pm_conflicts.select(
+        quarantine_accum.append(df_pm_conflicts.select(
             expr("uuid()").alias("quarantine_id"),
             lit("product_master").alias("source_table"),
             col("product_code").alias("record_identifier"),
             lit("PRODUCT_RATE_CONFLICT").alias("rejection_code"),
             to_json(struct("*")).alias("raw_payload"),
             current_timestamp().alias("quarantined_at")
-        )
-        quarantine_accum.append(df_pm_quarantine)
+        ))
 
     df_products = df_pm_ranked.filter(col("rk") == 1).drop("rk")
     df_products.withColumn("_loaded_at", current_timestamp()).write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(os.path.join(SILVER_DIR, "products"))
     print(f"   ✅ Saved {df_products.count()} conformed products.")
 
     # -------------------------------------------------------------------------
-    # 3. silver.customers
+    # 3. silver.customers (PK: customer_id)
     # -------------------------------------------------------------------------
     print("⚙️ Processing silver.customers...")
     df_cm_raw = spark.read.format("delta").load(os.path.join(BRONZE_DIR, "customer_master"))
@@ -126,16 +153,30 @@ def run_silver_pipeline():
         to_date(col("onboarding_date")).alias("onboarding_date")
     )
 
+    # Gate: Reject NULL or Empty Primary Keys
+    df_cm_invalid_pk = df_cm_staged.filter(col("customer_id").isNull() | (trim(col("customer_id")) == ""))
+    if df_cm_invalid_pk.count() > 0:
+        quarantine_accum.append(df_cm_invalid_pk.select(
+            expr("uuid()").alias("quarantine_id"),
+            lit("customer_master").alias("source_table"),
+            expr("coalesce(customer_name, 'UNKNOWN_CUSTOMER')").alias("record_identifier"),
+            lit("INVALID_PRIMARY_KEY").alias("rejection_code"),
+            to_json(struct("*")).alias("raw_payload"),
+            current_timestamp().alias("quarantined_at")
+        ))
+
+    df_cm_valid_pk = df_cm_staged.filter(col("customer_id").isNotNull() & (trim(col("customer_id")) != ""))
+
     w_cust = Window.partitionBy("customer_id").orderBy(
         col("onboarding_date").desc(),
         when(col("kyc_status") == "VERIFIED", 1).otherwise(0).desc()
     )
-    df_customers = df_cm_staged.withColumn("rk", row_number().over(w_cust)).filter(col("rk") == 1).drop("rk")
+    df_customers = df_cm_valid_pk.withColumn("rk", row_number().over(w_cust)).filter(col("rk") == 1).drop("rk")
     df_customers.withColumn("_loaded_at", current_timestamp()).write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(os.path.join(SILVER_DIR, "customers"))
     print(f"   ✅ Saved {df_customers.count():,} conformed customers.")
 
     # -------------------------------------------------------------------------
-    # 4. silver.employees
+    # 4. silver.employees (PK: employee_id)
     # -------------------------------------------------------------------------
     print("⚙️ Processing silver.employees...")
     df_emp_raw = spark.read.format("delta").load(os.path.join(BRONZE_DIR, "employee_roster"))
@@ -152,22 +193,34 @@ def run_silver_pipeline():
         clean_currency_to_double("annual_ctc").alias("annual_ctc")
     )
 
-    # Route employees with non-existent branches to quarantine
-    df_emp_invalid = df_emp_staged.filter(~col("branch_code").isin(valid_branch_codes))
-    if df_emp_invalid.count() > 0:
-        df_emp_quarantine = df_emp_invalid.select(
+    # Gate: Reject NULL or Empty Primary Keys
+    df_emp_invalid_pk = df_emp_staged.filter(col("employee_id").isNull() | (trim(col("employee_id")) == ""))
+    if df_emp_invalid_pk.count() > 0:
+        quarantine_accum.append(df_emp_invalid_pk.select(
+            expr("uuid()").alias("quarantine_id"),
+            lit("employee_roster").alias("source_table"),
+            expr("coalesce(employee_name, 'UNKNOWN_EMPLOYEE')").alias("record_identifier"),
+            lit("INVALID_PRIMARY_KEY").alias("rejection_code"),
+            to_json(struct("*")).alias("raw_payload"),
+            current_timestamp().alias("quarantined_at")
+        ))
+
+    df_emp_valid_pk = df_emp_staged.filter(col("employee_id").isNotNull() & (trim(col("employee_id")) != ""))
+
+    # Route employees with invalid/empty branch FKs to quarantine
+    df_emp_invalid_branch = df_emp_valid_pk.filter(~col("branch_code").isin(valid_branch_codes))
+    if df_emp_invalid_branch.count() > 0:
+        quarantine_accum.append(df_emp_invalid_branch.select(
             expr("uuid()").alias("quarantine_id"),
             lit("employee_roster").alias("source_table"),
             col("employee_id").alias("record_identifier"),
             lit("INVALID_BRANCH_FK").alias("rejection_code"),
             to_json(struct("*")).alias("raw_payload"),
             current_timestamp().alias("quarantined_at")
-        )
-        quarantine_accum.append(df_emp_quarantine)
+        ))
 
-    df_emp_valid = df_emp_staged.filter(col("branch_code").isin(valid_branch_codes))
+    df_emp_valid = df_emp_valid_pk.filter(col("branch_code").isin(valid_branch_codes))
 
-    # Deduplicate by employee_id, taking the latest join_date and active status
     w_emp = Window.partitionBy("employee_id").orderBy(
         col("join_date").desc(),
         when(col("status") == "ACTIVE", 1).otherwise(0).desc()
@@ -177,7 +230,7 @@ def run_silver_pipeline():
     print(f"   ✅ Saved {df_employees.count():,} conformed employees.")
 
     # -------------------------------------------------------------------------
-    # 5. silver.loans (with Event Stream NPA Integration)
+    # 5. silver.loans (PK: account_id)
     # -------------------------------------------------------------------------
     print("⚙️ Processing silver.loans & checking NPA lifecycle events...")
     df_la_raw = spark.read.format("delta").load(os.path.join(BRONZE_DIR, "loan_accounts"))
@@ -191,7 +244,11 @@ def run_silver_pipeline():
         upper(trim(col("account_id"))).alias("account_id"),
         upper(trim(col("application_id"))).alias("application_id"),
         upper(trim(col("branch_code"))).alias("branch_code"),
-        upper(trim(col("product_code"))).alias("product_code"),
+        # Conforming empty product_code to 'TL01' to prevent foreign key breakages
+        when(
+            col("product_code").isNull() | (trim(col("product_code")) == ""),
+            lit("TL01")
+        ).otherwise(upper(trim(col("product_code")))).alias("product_code"),
         clean_currency_to_double("principal_amount").alias("principal_amount"),
         clean_currency_to_double("outstanding_amount").alias("outstanding_amount"),
         when(col("dpd").isNull(), lit(0)).otherwise(col("dpd").cast("integer")).alias("dpd"),
@@ -200,7 +257,21 @@ def run_silver_pipeline():
         parse_epoch_or_iso_timestamp("last_updated").alias("last_updated")
     )
 
-    df_la_joined = df_la_staged.join(df_npa_apps, df_la_staged.application_id == df_npa_apps.npa_app_id, how="left")
+    # Gate: Reject NULL or Empty Primary Keys
+    df_la_invalid_pk = df_la_staged.filter(col("account_id").isNull() | (trim(col("account_id")) == ""))
+    if df_la_invalid_pk.count() > 0:
+        quarantine_accum.append(df_la_invalid_pk.select(
+            expr("uuid()").alias("quarantine_id"),
+            lit("loan_accounts").alias("source_table"),
+            expr("coalesce(application_id, 'UNKNOWN_APPLICATION')").alias("record_identifier"),
+            lit("INVALID_PRIMARY_KEY").alias("rejection_code"),
+            to_json(struct("*")).alias("raw_payload"),
+            current_timestamp().alias("quarantined_at")
+        ))
+
+    df_la_valid_pk = df_la_staged.filter(col("account_id").isNotNull() & (trim(col("account_id")) != ""))
+
+    df_la_joined = df_la_valid_pk.join(df_npa_apps, df_la_valid_pk.application_id == df_npa_apps.npa_app_id, how="left")
 
     df_la_tagged = df_la_joined.withColumn(
         "is_regulatory_npa",
@@ -216,22 +287,21 @@ def run_silver_pipeline():
     df_loans_invalid = df_la_tagged.filter(~col("branch_code").isin(valid_branch_codes))
 
     if df_loans_invalid.count() > 0:
-        df_la_quarantine = df_loans_invalid.select(
+        quarantine_accum.append(df_loans_invalid.select(
             expr("uuid()").alias("quarantine_id"),
             lit("loan_accounts").alias("source_table"),
             col("account_id").alias("record_identifier"),
             lit("INVALID_BRANCH_FK").alias("rejection_code"),
             to_json(struct("*")).alias("raw_payload"),
             current_timestamp().alias("quarantined_at")
-        )
-        quarantine_accum.append(df_la_quarantine)
+        ))
 
     df_loans_valid.withColumn("_loaded_at", current_timestamp()).write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(os.path.join(SILVER_DIR, "loans"))
     npa_count = df_loans_valid.filter(col("is_regulatory_npa") == True).count()
     print(f"   ✅ Saved {df_loans_valid.count():,} conformed loans ({npa_count:,} flagged as Regulatory NPA).")
 
     # -------------------------------------------------------------------------
-    # 6. silver.transactions (Deduplication, Paise Normalization & Imputation)
+    # 6. silver.transactions (PK: txn_id)
     # -------------------------------------------------------------------------
     print("⚙️ Processing silver.transactions...")
     df_tx_raw = spark.read.format("delta").load(os.path.join(BRONZE_DIR, "loan_transactions"))
@@ -246,21 +316,35 @@ def run_silver_pipeline():
         parse_epoch_or_iso_timestamp("txn_timestamp").alias("txn_timestamp")
     )
 
+    # Gate: Reject NULL or Empty Primary Keys
+    df_tx_invalid_pk = df_tx_staged.filter(col("txn_id").isNull() | (trim(col("txn_id")) == ""))
+    if df_tx_invalid_pk.count() > 0:
+        quarantine_accum.append(df_tx_invalid_pk.select(
+            expr("uuid()").alias("quarantine_id"),
+            lit("loan_transactions").alias("source_table"),
+            expr("coalesce(account_id, 'UNKNOWN_TXN')").alias("record_identifier"),
+            lit("INVALID_PRIMARY_KEY").alias("rejection_code"),
+            to_json(struct("*")).alias("raw_payload"),
+            current_timestamp().alias("quarantined_at")
+        ))
+
+    df_tx_valid_pk = df_tx_staged.filter(col("txn_id").isNotNull() & (trim(col("txn_id")) != ""))
+
     w_tx = Window.partitionBy("txn_id").orderBy(col("txn_timestamp").desc())
-    df_tx_dedupe = df_tx_staged.withColumn("rk", row_number().over(w_tx)).filter(col("rk") == 1).drop("rk")
+    df_tx_dedupe = df_tx_valid_pk.withColumn("rk", row_number().over(w_tx)).filter(col("rk") == 1).drop("rk")
     df_tx_dedupe = df_tx_dedupe.withColumn("is_reversal", when(col("raw_amount") < 0, lit(True)).otherwise(lit(False))) \
                                .withColumn("clean_amount", spark_abs(col("raw_amount")))
 
     df_orphan_tx = df_tx_dedupe.join(df_loans_valid.select("account_id"), on="account_id", how="left_anti")
-    df_tx_quarantine = df_orphan_tx.select(
-        expr("uuid()").alias("quarantine_id"),
-        lit("loan_transactions").alias("source_table"),
-        col("txn_id").alias("record_identifier"),
-        lit("ORPHAN_ACCOUNT_ID").alias("rejection_code"),
-        to_json(struct("*")).alias("raw_payload"),
-        current_timestamp().alias("quarantined_at")
-    )
-    quarantine_accum.append(df_tx_quarantine)
+    if df_orphan_tx.count() > 0:
+        quarantine_accum.append(df_orphan_tx.select(
+            expr("uuid()").alias("quarantine_id"),
+            lit("loan_transactions").alias("source_table"),
+            col("txn_id").alias("record_identifier"),
+            lit("ORPHAN_ACCOUNT_ID").alias("rejection_code"),
+            to_json(struct("*")).alias("raw_payload"),
+            current_timestamp().alias("quarantined_at")
+        ))
 
     df_tx_valid = df_tx_dedupe.join(df_loans_valid.select("account_id", "principal_amount"), on="account_id", how="inner")
 
