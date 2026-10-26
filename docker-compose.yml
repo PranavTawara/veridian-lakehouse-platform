@@ -1,9 +1,22 @@
-# Placeholder — replace with your actual local stack (database, orchestrator, API, object
-# storage, whatever you choose), or delete this file and use something else entirely if
-# docker-compose isn't your tool of choice. This file intentionally defines nothing: the
-# brief asks YOU to decide what goes here and be ready to justify it.
-#
-# services:
-#   db:
-#     image: postgres:16
-#     ...
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: veridian_source_pg
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: veridian_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d veridian_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

@@ -1,0 +1,5 @@
+region,states_covered,population_lakh,urbanization_pct,avg_income_index
+North,3,412,61,108
+South,3,389,68,121
+East,3,356,42,89
+West,3,401,58,115

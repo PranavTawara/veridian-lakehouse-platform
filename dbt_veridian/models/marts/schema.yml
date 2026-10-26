@@ -1,0 +1,96 @@
+version: 2
+
+models:
+  - name: dim_branch
+    description: "Conformed branch dimension"
+    columns:
+      - name: branch_key
+        tests:
+          - unique
+          - not_null
+      - name: branch_code
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_product
+    description: "Conformed product dimension"
+    columns:
+      - name: product_key
+        tests:
+          - unique
+          - not_null
+      - name: product_code
+        tests:
+          - unique
+          - not_null
+
+  - name: fact_branch_monthly_pnl
+    description: "Monthly branch P&L fact table"
+    columns:
+      - name: branch_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_branch')
+                field: branch_key
+      - name: financials_missing
+        tests:
+          - not_null
+
+  - name: fact_regional_risk_profile
+    description: "Regional risk and NPA performance profile"
+    columns:
+      - name: region
+        tests:
+          - unique
+          - not_null
+      - name: rag_status
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['GREEN', 'AMBER', 'RED']
+
+  - name: dim_customer
+    description: "Conformed customer demographic dimension"
+    columns:
+      - name: customer_key
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_employee
+    description: "Conformed employee dimension across branches"
+    columns:
+      - name: employee_key
+        tests:
+          - unique
+          - not_null
+      - name: employee_id
+        tests:
+          - unique
+          - not_null
+      - name: branch_code
+        tests:
+          - not_null
+
+  - name: fact_branch_staffing
+    description: "Branch staffing sizing, payroll, and loans-per-officer productivity benchmarks"
+    columns:
+      - name: branch_key
+        tests:
+          - unique
+          - not_null
+      - name: branch_code
+        tests:
+          - unique
+          - not_null
+      - name: total_active_staff
+        tests:
+          - not_null

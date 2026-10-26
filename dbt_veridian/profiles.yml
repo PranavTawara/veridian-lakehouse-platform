@@ -1,0 +1,13 @@
+veridian_postgres:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      port: 5432
+      user: postgres
+      pass: postgrespassword
+      dbname: veridian_db
+      schema: serving
+      threads: 4
+      

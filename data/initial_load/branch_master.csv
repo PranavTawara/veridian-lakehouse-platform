@@ -1,0 +1,89 @@
+branch_code,branch_name,region,state,city,branch_type,open_date
+BR-001,Veridian Chennai Urban,South,Tamil Nadu,Chennai,Urban,2022-09-19
+BR-002,Veridian Patna Urban,East,Bihar,Patna,Urban,2019-08-25
+BR-003,Veridian Pune Semi-urban,West,Maharashtra,Pune,Semi-urban,2023-01-14
+BR-004,Veridian Gurugram Semi-urban,North,Haryana,Gurugram,Semi-urban,2024-08-29
+BR-005,Veridian Bengaluru Metro,South,Karnataka,Bengaluru,Metro,30/09/2021
+BR-006,Veridian Bhubaneswar Semi-urban,East,Odisha,Bhubaneswar,Semi-urban,2016-10-01
+BR-007,Veridian Ahmedabad Metro,West,Gujarat,Ahmedabad,Metro,2023-08-08
+BR-008,Veridian Gurugram Metro,North,Haryana,Gurugram,Metro,2021-07-31
+BR-009,Veridian Gurugram Metro,North,Haryana,Gurugram,Metro,2019-05-17
+BR-010,Veridian Bhubaneswar Semi-urban,East,Odisha,Bhubaneswar,Semi-urban,18/11/2019
+BR-011,Veridian Ahmedabad Semi-urban,West,Gujarat,Ahmedabad,Semi-urban,2018-04-09
+BR-012,Veridian Gurugram Urban,North,Haryana,Gurugram,Urban,2021-03-08
+BR-013,Veridian Bengaluru Urban,South,Karnataka,Bengaluru,Urban,2022-01-09
+BR-014,Veridian Ahmedabad Metro,West,Gujarat,Ahmedabad,Metro,2022-01-20
+BR-015,Veridian Jaipur Metro,West,Rajasthan,Jaipur,Metro,29/07/2023
+BR-016,Veridian Gurugram Urban,North,Haryana,Gurugram,Urban,2021-12-30
+BR-017,Veridian Bengaluru Semi-urban,South,Karnataka,Bengaluru,Semi-urban,2024-01-08
+BR-018,Veridian Kolkata Semi-urban,East,West Bengal,Kolkata,Semi-urban,2016-02-27
+BR-019,Veridian Jaipur Metro,West,Rajasthan,Jaipur,Metro,2024-09-10
+BR-020,Veridian Gurugram Semi-urban,North,Haryana,Gurugram,Semi-urban,22/09/2020
+BR-021,Veridian Kochi Urban,South,Kerala,Kochi,Urban,2020-01-21
+BR-022,Veridian Noida Urban,North,Delhi NCR,Noida,Urban,2022-10-09
+BR-023,Veridian Ahmedabad Urban,West,Gujarat,Ahmedabad,Urban,2019-01-31
+BR-024,Veridian Noida Metro,North,Delhi NCR,Noida,Metro,2023-07-23
+BR-025,Veridian Kochi Urban,South,Kerala,Kochi,Urban,04/02/2020
+BR-026,Veridian Patna Semi-urban,East,Bihar,Patna,Semi-urban,2021-03-15
+BR-027,Veridian Bengaluru Metro,South,Karnataka,Bengaluru,Metro,2017-05-25
+BR-028,Veridian Gurugram Metro,North,Haryana,Gurugram,Metro,2021-04-26
+BR-029,Veridian Chennai Semi-urban,South,Tamil Nadu,Chennai,Semi-urban,2017-06-03
+BR-030,Veridian Bhubaneswar Metro,East,Odisha,Bhubaneswar,Metro,05/03/2017
+BR-031,Veridian Pune Metro,West,Maharashtra,Pune,Metro,2016-11-20
+BR-032,Veridian Chennai Urban,South,Tamil Nadu,Chennai,Urban,2022-07-10
+BR-033,Veridian Kochi Urban,South,Kerala,Kochi,Urban,2017-11-22
+BR-034,Veridian Patna Urban,East,Bihar,Patna,Urban,2017-12-13
+BR-035,Veridian Jaipur Urban,West,Rajasthan,Jaipur,Urban,04/11/2016
+BR-036,Veridian Gurugram Semi-urban,North,Haryana,Gurugram,Semi-urban,2018-01-11
+BR-037,Veridian Bengaluru Semi-urban,South,Karnataka,Bengaluru,Semi-urban,2018-09-13
+BR-038,Veridian Bhubaneswar Semi-urban,East,Odisha,Bhubaneswar,Semi-urban,2021-06-29
+BR-039,Veridian Pune Metro,West,Maharashtra,Pune,Metro,2018-05-11
+BR-040,Veridian Noida Semi-urban,North,Delhi NCR,Noida,Semi-urban,21/02/2024
+BR-041,Veridian Bhubaneswar Metro,East,Odisha,Bhubaneswar,Metro,2018-05-16
+BR-042,Veridian Kolkata Metro,East,West Bengal,Kolkata,Metro,2021-07-03
+BR-043,Veridian Jaipur Urban,West,Rajasthan,Jaipur,Urban,2023-08-25
+BR-044,Veridian Ludhiana Urban,North,Punjab,Ludhiana,Urban,2018-04-02
+BR-045,Veridian Kochi Urban,South,Kerala,Kochi,Urban,24/06/2022
+BR-046,Veridian Bhubaneswar Semi-urban,East,Odisha,Bhubaneswar,Semi-urban,2024-01-17
+BR-047,Veridian Pune Urban,West,Maharashtra,Pune,Urban,2024-04-04
+BR-048,Veridian Noida Urban,North,Delhi NCR,Noida,Urban,2024-07-10
+BR-049,Veridian Chennai Urban,South,Tamil Nadu,Chennai,Urban,2020-03-08
+BR-050,Veridian Bhubaneswar Metro,East,Odisha,Bhubaneswar,Metro,05/04/2023
+BR-051,Veridian Ahmedabad Metro,West,Gujarat,Ahmedabad,Metro,2023-03-15
+BR-052,Veridian Ludhiana Semi-urban,North,Punjab,Ludhiana,Semi-urban,2023-11-14
+BR-053,Veridian Chennai Urban,South,Tamil Nadu,Chennai,Urban,2024-04-20
+BR-054,Veridian Bhubaneswar Semi-urban,East,Odisha,Bhubaneswar,Semi-urban,2024-04-13
+BR-055,Veridian Pune Metro,West,Maharashtra,Pune,Metro,08/11/2022
+BR-056,Veridian Noida Semi-urban,North,Delhi NCR,Noida,Semi-urban,2020-11-20
+BR-057,Veridian Bengaluru Urban,South,Karnataka,Bengaluru,Urban,2024-08-03
+BR-058,Veridian Patna Semi-urban,East,Bihar,Patna,Semi-urban,2023-10-04
+BR-059,Veridian Pune Urban,West,Maharashtra,Pune,Urban,2016-03-30
+BR-060,Veridian Noida Urban,North,Delhi NCR,Noida,Urban,06/06/2019
+BR-061,Veridian Chennai Semi-urban,South,Tamil Nadu,Chennai,Semi-urban,2016-11-30
+BR-062,Veridian Kolkata Semi-urban,East,West Bengal,Kolkata,Semi-urban,2016-10-30
+BR-063,Veridian Pune Urban,West,Maharashtra,Pune,Urban,2021-05-28
+BR-064,Veridian Ludhiana Semi-urban,North,Punjab,Ludhiana,Semi-urban,2020-08-31
+BR-065,Veridian Bengaluru Urban,South,Karnataka,Bengaluru,Urban,01/04/2019
+BR-066,Veridian Kolkata Semi-urban,East,West Bengal,Kolkata,Semi-urban,2024-08-28
+BR-067,Veridian Jaipur Urban,West,Rajasthan,Jaipur,Urban,2021-03-05
+BR-068,Veridian Noida Semi-urban,North,Delhi NCR,Noida,Semi-urban,2023-09-16
+BR-069,Veridian Kochi Urban,South,Kerala,Kochi,Urban,2022-08-11
+BR-070,Veridian Bhubaneswar Metro,East,Odisha,Bhubaneswar,Metro,07/03/2018
+BR-071,Veridian Pune Semi-urban,West,Maharashtra,Pune,Semi-urban,2016-10-23
+BR-072,Veridian Ludhiana Urban,North,Punjab,Ludhiana,Urban,2017-06-09
+BR-073,Veridian Kochi Semi-urban,South,Kerala,Kochi,Semi-urban,2022-11-04
+BR-074,Veridian Patna Urban,East,Bihar,Patna,Urban,2017-01-05
+BR-075,Veridian Jaipur Metro,West,Rajasthan,Jaipur,Metro,16/01/2017
+BR-076,Veridian Noida Semi-urban,North,Delhi NCR,Noida,Semi-urban,2021-07-30
+BR-077,Veridian Kochi Urban,South,Kerala,Kochi,Urban,2018-09-11
+BR-078,Veridian Kolkata Metro,East,West Bengal,Kolkata,Metro,2017-10-11
+BR-079,Veridian Jaipur Metro,West,Rajasthan,Jaipur,Metro,2023-04-25
+BR-080,Veridian Noida Urban,North,Delhi NCR,Noida,Urban,08/10/2023
+BR-081,Veridian Chennai Urban,South,Tamil Nadu,Chennai,Urban,2024-06-26
+BR-082,Veridian Bhubaneswar Semi-urban,East,Odisha,Bhubaneswar,Semi-urban,2022-01-18
+BR-083,Veridian Jaipur Metro,West,Rajasthan,Jaipur,Metro,2024-06-16
+BR-084,Veridian Gurugram Semi-urban,North,Haryana,Gurugram,Semi-urban,2020-05-22
+BR-085,Veridian Chennai Semi-urban,South,Tamil Nadu,Chennai,Semi-urban,22/02/2016
+BR-014,Veridian Pune Metro,west,maharashtra,PUNE,Urban,11/03/2019
+br-027,Veridian Chennai Urban ,South,TN,chennai,Urban,2020-07-22
+BR-009,Veridian Gurugram Metro,North,Haryana,Gurugram ,Metro,02-11-2018

@@ -1,0 +1,9 @@
+product_code,product_name,category,interest_rate
+PL01,Personal Loan,Personal,12.5
+PL01,personal_loan,Personal,12.5
+GL01,Gold Loan,Gold,9.75
+GL01,GOLD LOAN,Gold,9.8
+ML01,MSME Loan,MSME,14.0
+ML01,MSME_Loan,MSME,14.0
+HL01,Home Loan,Housing,8.6
+,Two-Wheeler Loan,Personal,16.2

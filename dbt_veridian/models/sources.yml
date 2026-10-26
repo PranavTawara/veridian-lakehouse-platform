@@ -1,0 +1,30 @@
+version: 2
+
+sources:
+  - name: source
+    database: veridian_db
+    schema: source
+    tables:
+      - name: account_status_events
+      - name: branch_financials
+      - name: branch_master
+      - name: customer_master
+      - name: deposit_accounts
+      - name: employee_roster
+      - name: loan_accounts
+      - name: loan_applications
+      - name: loan_transactions
+      - name: product_master
+      - name: region_demographics
+
+  - name: silver
+    database: veridian_db
+    schema: silver
+    tables:
+      - name: branches
+      - name: products
+      - name: customers
+      - name: employees
+      - name: loans
+      - name: transactions
+      - name: quarantine

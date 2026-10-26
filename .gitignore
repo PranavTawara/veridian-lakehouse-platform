@@ -1,0 +1,35 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+
+# Delta Lake Parquet files & storage (track structure via .gitkeep)
+lakehouse/bronze/*
+lakehouse/silver/*
+!lakehouse/bronze/.gitkeep
+!lakehouse/silver/.gitkeep
+
+# Airflow local runtime logs & metadata db
+orchestration/logs/
+orchestration/airflow.db
+orchestration/airflow.cfg
+orchestration/webserver_config.py
+
+# dbt compilation artifacts
+dbt_veridian/target/
+dbt_veridian/dbt_packages/
+dbt_veridian/logs/
+
+# Sensitive files
+.env
+*.pem
+
+# Log directories
+logs/
+*.log
