@@ -33,3 +33,8 @@ dbt_veridian/logs/
 # Log directories
 logs/
 *.log
+
+# Airflow runtime files and process IDs
+orchestration/*.pid
+orchestration/*.out
+orchestration/*.err
