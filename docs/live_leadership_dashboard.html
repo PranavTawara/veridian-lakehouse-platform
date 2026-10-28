@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Veridian Finance - Live Leadership Dashboard</title>
+<style>
+  :root {
+    --bg:#FFFFFF; --ink:#000000; --ink-soft:#352F3D; --muted:#808080;
+    --border:#C9C9CE; --accent:#F36B1D;
+    --region-north:#2a78d6; --region-south:#F36B1D; --region-east:#1baf7a; --region-west:#eda100;
+    --status-good:#2E9E5B; --status-warn:#E09A2B; --status-crit:#D64545;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: "Aptos", Arial, sans-serif; line-height: 1.5; }
+  .page { max-width: 1180px; margin: 0 auto; padding: 40px 28px 60px; }
+  .eyebrow { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+  .trule { width: 110px; height: 3px; background: var(--accent); border-radius: 1px; margin-bottom: 18px; }
+  h1 { font-size: 32px; font-weight: 700; margin: 0; }
+  h1 .period { color: var(--accent); }
+  .sub { color: var(--ink-soft); font-size: 15px; max-width: 76ch; margin-top: 8px; }
+  .live-badge { display: inline-block; margin-top: 14px; font-size: 11px; font-weight: 700; color: var(--status-good); border: 1px solid var(--status-good); border-radius: 5px; padding: 3px 8px; text-transform: uppercase; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 28px; }
+  .kpi { border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .kpi .label { font-size: 12px; color: var(--muted); text-transform: uppercase; font-weight: 600; }
+  .kpi .value { font-size: 30px; font-weight: 700; margin-top: 6px; }
+  .kpi .delta { font-size: 12.5px; margin-top: 4px; }
+  .delta.up { color: var(--status-good); } .delta.watch { color: var(--status-warn); } .delta.flat { color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: 1.15fr .85fr; gap: 16px; margin-top: 16px; }
+  .panel { border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-top: 16px; }
+  .panel .phead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .panel h2 { font-size: 16px; font-weight: 700; margin: 0; }
+  .panel .pnote { font-size: 12.5px; color: var(--muted); }
+  .panel .pdesc { font-size: 13px; color: var(--ink-soft); margin-bottom: 14px; }
+  .legend { display: flex; gap: 14px; margin: 10px 0 4px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-soft); }
+  .legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+  .barlabel { font-size: 11.5px; fill: var(--ink-soft); }
+  .barvalue { font-size: 11.5px; fill: var(--ink); font-weight: 600; }
+  table.ragtable { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  table.ragtable th { text-align: left; font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.ragtable td { padding: 9px 10px; border-bottom: 1px solid #E6E6EA; font-size: 13px; color: var(--ink-soft); }
+  table.ragtable td.num { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .statuspill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; }
+  .statuspill i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .s-good i { background: var(--status-good); } .s-good { color: var(--status-good); }
+  .s-warn i { background: var(--status-warn); } .s-warn { color: var(--status-warn); }
+  .s-crit i { background: var(--status-crit); } .s-crit { color: var(--status-crit); }
+  footer.legalbar { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow">
+    <span>Veridian Finance &middot; Executive Review</span>
+    <span style="color:var(--muted);">Live Medallion Pipeline Output</span>
+  </div>
+  <div class="trule"></div>
+  <h1>Branch performance &amp; expansion readiness<span class="period">.</span></h1>
+  <p class="sub">Executive visibility served directly from the <strong>PostgreSQL serving layer</strong>, populated via PySpark and dbt-core.</p>
+  <span class="live-badge">&#x25CF; Live Verified Data</span>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="label">Active Branches</div>
+      <div class="value">85</div>
+      <div class="delta up">Cleaned & conformed</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Total Loan Book</div>
+      <div class="value">₹461.6 Cr</div>
+      <div class="delta up">Across all 4 regions</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Portfolio Watchlist</div>
+      <div class="value">15.1%</div>
+      <div class="delta watch">SMA-0 Early Delinquency (1–30 DPD)</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Regulatory NPA</div>
+      <div class="value">0.0%</div>
+      <div class="delta up">DPD &ge; 90 / CBS Default</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel">
+      <div class="phead">
+        <h2>Branch profitability ranking</h2>
+        <span class="pnote">₹ lakh net contribution / month</span>
+      </div>
+      <p class="pdesc">Top performers derived from <code>serving.fact_branch_monthly_pnl</code> joined with <code>serving.dim_branch</code>.</p>
+      <div class="legend">
+        <span><i style="background:var(--region-north)"></i>North</span>
+        <span><i style="background:var(--region-south)"></i>South</span>
+        <span><i style="background:var(--region-east)"></i>East</span>
+        <span><i style="background:var(--region-west)"></i>West</span>
+      </div>
+      <svg viewBox="0 0 620 310" style="width:100%; height:auto;">
+        <line x1="120" y1="10" x2="120" y2="300" stroke="var(--border)" stroke-width="1"/>
+        
+    <g transform="translate(0,14.0)">
+      <text x="112" y="10" text-anchor="end" class="barlabel">BR-064</text>
+      <rect x="120" y="0" width="430" height="16" rx="4" fill="var(--region-north)"/>
+      <text x="558" y="12" class="barvalue">₹3.7L</text>
+    </g>
+    <g transform="translate(0,51.5)">
+      <text x="112" y="10" text-anchor="end" class="barlabel">BR-077</text>
+      <rect x="120" y="0" width="430" height="16" rx="4" fill="var(--region-south)"/>
+      <text x="558" y="12" class="barvalue">₹3.7L</text>
+    </g>
+    <g transform="translate(0,89.0)">
+      <text x="112" y="10" text-anchor="end" class="barlabel">BR-030</text>
+      <rect x="120" y="0" width="418" height="16" rx="4" fill="var(--region-east)"/>
+      <text x="546" y="12" class="barvalue">₹3.6L</text>
+    </g>
+    <g transform="translate(0,126.5)">
+      <text x="112" y="10" text-anchor="end" class="barlabel">BR-037</text>
+      <rect x="120" y="0" width="418" height="16" rx="4" fill="var(--region-south)"/>
+      <text x="546" y="12" class="barvalue">₹3.6L</text>
+    </g>
+    <g transform="translate(0,164.0)">
+      <text x="112" y="10" text-anchor="end" class="barlabel">BR-045</text>
+      <rect x="120" y="0" width="418" height="16" rx="4" fill="var(--region-south)"/>
+      <text x="546" y="12" class="barvalue">₹3.6L</text>
+    </g>
+    <g transform="translate(0,201.5)">
+      <text x="112" y="10" text-anchor="end" class="barlabel">BR-036</text>
+      <rect x="120" y="0" width="337" height="16" rx="4" fill="var(--region-north)"/>
+      <text x="465" y="12" class="barvalue">₹2.9L</text>
+    </g>
+    <g transform="translate(0,239.0)">
+      <text x="112" y="10" text-anchor="end" class="barlabel">BR-004</text>
+      <rect x="120" y="0" width="337" height="16" rx="4" fill="var(--region-north)"/>
+      <text x="465" y="12" class="barvalue">₹2.9L</text>
+    </g>
+    <g transform="translate(0,276.5)">
+      <text x="112" y="10" text-anchor="end" class="barlabel">BR-046</text>
+      <rect x="120" y="0" width="337" height="16" rx="4" fill="var(--region-east)"/>
+      <text x="465" y="12" class="barvalue">₹2.9L</text>
+    </g>
+      </svg>
+    </div>
+
+    <div class="panel">
+      <div class="phead"><h2>New-branch sizing guide</h2></div>
+      <p class="pdesc">Target staffing and risk buffer from <code>serving.fact_branch_staffing</code>.</p>
+      <table class="ragtable">
+        <tr><th>Branch Type</th><th>Avg Staff</th><th>Avg Ticket</th><th>Risk Buffer</th></tr>
+        
+    <tr>
+      <td>Metro</td>
+      <td class="num">799</td>
+      <td class="num">₹3.3L</td>
+      <td><span class="statuspill s-crit"><i></i>High</span></td>
+    </tr>
+    <tr>
+      <td>Urban</td>
+      <td class="num">508</td>
+      <td class="num">₹3.3L</td>
+      <td><span class="statuspill s-crit"><i></i>High</span></td>
+    </tr>
+    <tr>
+      <td>Semi-urban</td>
+      <td class="num">306</td>
+      <td class="num">₹3.3L</td>
+      <td><span class="statuspill s-crit"><i></i>High</span></td>
+    </tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid2" style="grid-template-columns: 1fr;">
+    <div class="panel">
+      <div class="phead">
+        <h2>Geographic Risk Concentration &amp; Expansion Guidance</h2>
+        <span class="pnote">Dual-Horizon Credit Risk Analysis</span>
+      </div>
+      <p class="pdesc">Reconciled portfolio quality from <code>serving.fact_regional_risk_profile</code> guiding branch capital allocation.</p>
+      <table class="ragtable">
+        <tr>
+          <th>Region</th>
+          <th>Accounts</th>
+          <th>Loan Book</th>
+          <th>Early Watchlist (SMA-0)</th>
+          <th>Regulatory NPA</th>
+          <th>Portfolio Health</th>
+          <th>Expansion Strategy</th>
+        </tr>
+        
+    <tr>
+      <td><strong>North</strong></td>
+      <td class="num">3,608</td>
+      <td class="num">₹117.7 Cr</td>
+      <td class="num">15.96%</td>
+      <td class="num">0.00%</td>
+      <td><span class="statuspill s-crit"><i></i>Elevated Risk</span></td>
+      <td><span style="font-size:12px; color:var(--ink-soft);">Tighten Underwriting / High Watchlist</span></td>
+    </tr>
+    <tr>
+      <td><strong>South</strong></td>
+      <td class="num">3,529</td>
+      <td class="num">₹117.1 Cr</td>
+      <td class="num">15.21%</td>
+      <td class="num">0.00%</td>
+      <td><span class="statuspill s-warn"><i></i>Watchlist</span></td>
+      <td><span style="font-size:12px; color:var(--ink-soft);">Selective (Monitor SMA-0)</span></td>
+    </tr>
+    <tr>
+      <td><strong>East</strong></td>
+      <td class="num">3,314</td>
+      <td class="num">₹108.4 Cr</td>
+      <td class="num">14.71%</td>
+      <td class="num">0.00%</td>
+      <td><span class="statuspill s-warn"><i></i>Watchlist</span></td>
+      <td><span style="font-size:12px; color:var(--ink-soft);">Stable Expansion</span></td>
+    </tr>
+    <tr>
+      <td><strong>West</strong></td>
+      <td class="num">3,614</td>
+      <td class="num">₹118.4 Cr</td>
+      <td class="num">14.50%</td>
+      <td class="num">0.00%</td>
+      <td><span class="statuspill s-good"><i></i>Low Risk</span></td>
+      <td><span style="font-size:12px; color:var(--ink-soft);">Prime Priority (Lowest Delinquency)</span></td>
+    </tr>
+      </table>
+    </div>
+  </div>
+
+  <footer class="legalbar">
+    <span>Veridian Data Platform &middot; Confidential</span>
+    <span>Orchestrated via Apache Airflow &middot; dbt-core &middot; Delta Lake</span>
+  </footer>
+</div>
+</body>
+</html>

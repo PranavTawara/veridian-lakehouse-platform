@@ -28,6 +28,19 @@ def parse_epoch_or_iso_timestamp(col_name):
         (col(col_name).cast("double") / 1000.0).cast("timestamp")
     ).otherwise(to_timestamp(col(col_name)))
 
+def parse_multi_format_date(col_name):
+    """Safely parses dd/MM/yyyy, yyyy-MM-dd, and epoch timestamps without throwing exceptions."""
+    return when(
+        col(col_name).rlike(r"^\d{1,2}/\d{1,2}/\d{4}$"),
+        to_date(col(col_name), "d/M/yyyy")
+    ).when(
+        col(col_name).rlike(r"^\d{4}-\d{2}-\d{2}$"),
+        to_date(col(col_name), "yyyy-MM-dd")
+    ).when(
+        col(col_name).rlike(r"^\d{13}$"),
+        (col(col_name).cast("double") / 1000.0).cast("timestamp").cast("date")
+    ).otherwise(to_date(col(col_name)))
+
 def clean_currency_to_double(col_name):
     return regexp_replace(col(col_name), r"[\$₹,\s]", "").cast("double")
 
@@ -57,7 +70,6 @@ def run_silver_pipeline():
         to_date(col("open_date")).alias("open_date")
     )
 
-    # Gate: Reject NULL or Empty Primary Keys
     df_bm_invalid_pk = df_bm_staged.filter(col("branch_code").isNull() | (trim(col("branch_code")) == ""))
     if df_bm_invalid_pk.count() > 0:
         quarantine_accum.append(df_bm_invalid_pk.select(
@@ -96,7 +108,6 @@ def run_silver_pipeline():
     print("⚙️ Processing silver.products...")
     df_pm_raw = spark.read.format("delta").load(os.path.join(BRONZE_DIR, "product_master"))
 
-    # Upstream source fix: Map Two-Wheeler Loan to TL01 if missing, uppercase others
     df_pm_staged = df_pm_raw.select(
         when(trim(col("product_name")) == "Two-Wheeler Loan", lit("TL01"))
         .otherwise(upper(trim(col("product_code")))).alias("product_code"),
@@ -105,7 +116,6 @@ def run_silver_pipeline():
         clean_currency_to_double("interest_rate").alias("interest_rate")
     )
 
-    # Gate: Reject NULL or Empty Primary Keys
     df_pm_invalid_pk = df_pm_staged.filter(col("product_code").isNull() | (trim(col("product_code")) == ""))
     if df_pm_invalid_pk.count() > 0:
         quarantine_accum.append(df_pm_invalid_pk.select(
@@ -150,10 +160,9 @@ def run_silver_pipeline():
         trim(col("state")).alias("state"),
         upper(trim(col("kyc_status"))).alias("kyc_status"),
         trim(col("income_band")).alias("income_band"),
-        to_date(col("onboarding_date")).alias("onboarding_date")
+        parse_multi_format_date("onboarding_date").alias("onboarding_date")
     )
 
-    # Gate: Reject NULL or Empty Primary Keys
     df_cm_invalid_pk = df_cm_staged.filter(col("customer_id").isNull() | (trim(col("customer_id")) == ""))
     if df_cm_invalid_pk.count() > 0:
         quarantine_accum.append(df_cm_invalid_pk.select(
@@ -173,7 +182,8 @@ def run_silver_pipeline():
     )
     df_customers = df_cm_valid_pk.withColumn("rk", row_number().over(w_cust)).filter(col("rk") == 1).drop("rk")
     df_customers.withColumn("_loaded_at", current_timestamp()).write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(os.path.join(SILVER_DIR, "customers"))
-    print(f"   ✅ Saved {df_customers.count():,} conformed customers.")
+    null_dates = df_customers.filter(col("onboarding_date").isNull()).count()
+    print(f"   ✅ Saved {df_customers.count():,} conformed customers ({null_dates} null onboarding dates).")
 
     # -------------------------------------------------------------------------
     # 4. silver.employees (PK: employee_id)
@@ -193,7 +203,6 @@ def run_silver_pipeline():
         clean_currency_to_double("annual_ctc").alias("annual_ctc")
     )
 
-    # Gate: Reject NULL or Empty Primary Keys
     df_emp_invalid_pk = df_emp_staged.filter(col("employee_id").isNull() | (trim(col("employee_id")) == ""))
     if df_emp_invalid_pk.count() > 0:
         quarantine_accum.append(df_emp_invalid_pk.select(
@@ -207,7 +216,6 @@ def run_silver_pipeline():
 
     df_emp_valid_pk = df_emp_staged.filter(col("employee_id").isNotNull() & (trim(col("employee_id")) != ""))
 
-    # Route employees with invalid/empty branch FKs to quarantine
     df_emp_invalid_branch = df_emp_valid_pk.filter(~col("branch_code").isin(valid_branch_codes))
     if df_emp_invalid_branch.count() > 0:
         quarantine_accum.append(df_emp_invalid_branch.select(
@@ -232,19 +240,32 @@ def run_silver_pipeline():
     # -------------------------------------------------------------------------
     # 5. silver.loans (PK: account_id)
     # -------------------------------------------------------------------------
-    print("⚙️ Processing silver.loans & checking NPA lifecycle events...")
+    print("⚙️ Processing silver.loans & checking NPA regulatory compliance...")
     df_la_raw = spark.read.format("delta").load(os.path.join(BRONZE_DIR, "loan_accounts"))
     df_ase_raw = spark.read.format("delta").load(os.path.join(BRONZE_DIR, "account_status_events"))
 
-    df_npa_apps = df_ase_raw.filter(upper(trim(col("event_type"))) == "NPA_TAGGED") \
-                            .select(upper(trim(col("application_id"))).alias("npa_app_id")) \
-                            .distinct()
+    df_ase_parsed = df_ase_raw.filter(
+        col("application_id").isNotNull() & (trim(col("application_id")) != "")
+    ).select(
+        upper(trim(col("application_id"))).alias("app_id"),
+        parse_epoch_or_iso_timestamp("event_time").alias("event_timestamp"),
+        upper(trim(col("new_status"))).alias("latest_status")
+    )
+
+    w_ase = Window.partitionBy("app_id").orderBy(col("event_timestamp").desc())
+    df_active_npa_events = (
+        df_ase_parsed
+        .withColumn("rk", row_number().over(w_ase))
+        .filter(col("rk") == 1)
+        .filter(col("latest_status") == "NPA")
+        .select(col("app_id").alias("npa_app_id"))
+        .distinct()
+    )
 
     df_la_staged = df_la_raw.select(
         upper(trim(col("account_id"))).alias("account_id"),
         upper(trim(col("application_id"))).alias("application_id"),
         upper(trim(col("branch_code"))).alias("branch_code"),
-        # Conforming empty product_code to 'TL01' to prevent foreign key breakages
         when(
             col("product_code").isNull() | (trim(col("product_code")) == ""),
             lit("TL01")
@@ -257,7 +278,6 @@ def run_silver_pipeline():
         parse_epoch_or_iso_timestamp("last_updated").alias("last_updated")
     )
 
-    # Gate: Reject NULL or Empty Primary Keys
     df_la_invalid_pk = df_la_staged.filter(col("account_id").isNull() | (trim(col("account_id")) == ""))
     if df_la_invalid_pk.count() > 0:
         quarantine_accum.append(df_la_invalid_pk.select(
@@ -271,7 +291,11 @@ def run_silver_pipeline():
 
     df_la_valid_pk = df_la_staged.filter(col("account_id").isNotNull() & (trim(col("account_id")) != ""))
 
-    df_la_joined = df_la_valid_pk.join(df_npa_apps, df_la_valid_pk.application_id == df_npa_apps.npa_app_id, how="left")
+    df_la_joined = df_la_valid_pk.join(
+        df_active_npa_events,
+        df_la_valid_pk.application_id == df_active_npa_events.npa_app_id,
+        how="left"
+    )
 
     df_la_tagged = df_la_joined.withColumn(
         "is_regulatory_npa",
@@ -316,7 +340,6 @@ def run_silver_pipeline():
         parse_epoch_or_iso_timestamp("txn_timestamp").alias("txn_timestamp")
     )
 
-    # Gate: Reject NULL or Empty Primary Keys
     df_tx_invalid_pk = df_tx_staged.filter(col("txn_id").isNull() | (trim(col("txn_id")) == ""))
     if df_tx_invalid_pk.count() > 0:
         quarantine_accum.append(df_tx_invalid_pk.select(
@@ -348,7 +371,7 @@ def run_silver_pipeline():
 
     df_tx_valid = df_tx_dedupe.join(df_loans_valid.select("account_id", "principal_amount"), on="account_id", how="inner")
 
-    df_tx_conformed = df_tx_valid.withColumn(
+    df_tx_adjusted = df_tx_valid.withColumn(
         "clean_amount",
         when(
             (col("txn_type") == "DISBURSEMENT") & (col("clean_amount").isNull() | (col("clean_amount") == 0)),
@@ -359,8 +382,21 @@ def run_silver_pipeline():
         ).otherwise(col("clean_amount"))
     ).drop("principal_amount")
 
+    # Gate: Reject transactions with NULL, zero, or unparseable monetary amounts
+    df_tx_invalid_amount = df_tx_adjusted.filter(col("clean_amount").isNull() | (col("clean_amount") <= 0))
+    if df_tx_invalid_amount.count() > 0:
+        quarantine_accum.append(df_tx_invalid_amount.select(
+            expr("uuid()").alias("quarantine_id"),
+            lit("loan_transactions").alias("source_table"),
+            col("txn_id").alias("record_identifier"),
+            lit("INVALID_TXN_AMOUNT").alias("rejection_code"),
+            to_json(struct("*")).alias("raw_payload"),
+            current_timestamp().alias("quarantined_at")
+        ))
+
+    df_tx_conformed = df_tx_adjusted.filter(col("clean_amount").isNotNull() & (col("clean_amount") > 0))
     df_tx_conformed.withColumn("_loaded_at", current_timestamp()).write.format("delta").mode("overwrite").option("overwriteSchema", "true").save(os.path.join(SILVER_DIR, "transactions"))
-    print(f"   ✅ Saved {df_tx_conformed.count():,} conformed transactions.")
+    print(f"   ✅ Saved {df_tx_conformed.count():,} conformed transactions ({df_tx_invalid_amount.count():,} unvalued repayments quarantined).")
 
     # -------------------------------------------------------------------------
     # 7. Quarantine Consolidation
