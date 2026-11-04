@@ -19,5 +19,5 @@ An enterprise financial data lakehouse and API serving platform implementing Med
 
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/PranavTawara/veridian-lakehouse-platform.git](https://github.com/PranavTawara/veridian-lakehouse-platform.git)
+   git clone https://github.com/PranavTawara/veridian-lakehouse-platform.git
    cd veridian-lakehouse-platform
