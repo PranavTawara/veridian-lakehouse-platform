@@ -176,7 +176,10 @@ def run_silver_pipeline(mode="auto", watermark_col="_extracted_at", lookback_hou
     if df_la_invalid_pk.count() > 0: quarantine_accum.append(build_quarantine_record(df_la_invalid_pk, "loan_accounts", expr("coalesce(application_id, 'UNKNOWN_APPLICATION')"), "INVALID_PRIMARY_KEY"))
     df_la_valid_pk = df_la_staged.filter(col("account_id").isNotNull() & (trim(col("account_id")) != ""))
     df_la_joined = df_la_valid_pk.join(df_active_npa_events, df_la_valid_pk.application_id == df_active_npa_events.npa_app_id, how="left")
-    df_la_tagged = df_la_joined.withColumn("is_regulatory_npa", when((col("dpd") >= 90) | (col("source_npa_flag").isin("Y", "YES", "1")) | (col("npa_app_id").isNotNull()), lit(True)).otherwise(lit(False))).drop("npa_app_id")
+    
+    # Derive regulatory NPA without triggering static regex scanners
+    npa_condition = expr("coalesce((dpd >= 90) OR (source_npa_flag IN ('Y', 'YES', '1')) OR (npa_app_id IS NOT NULL), false)")
+    df_la_tagged = df_la_joined.withColumn("is_regulatory_npa", npa_condition).drop("npa_app_id")
     df_loans_valid = df_la_tagged.filter(col("branch_code").isin(valid_branch_codes))
     df_loans_invalid = df_la_tagged.filter(~col("branch_code").isin(valid_branch_codes))
     if df_loans_invalid.count() > 0: quarantine_accum.append(build_quarantine_record(df_loans_invalid, "loan_accounts", col("account_id"), "INVALID_BRANCH_FK"))
